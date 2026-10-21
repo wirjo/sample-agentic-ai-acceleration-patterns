@@ -17,6 +17,7 @@ described in [the Sample Standard](./docs/sample-standard.md).
 
 - [Samples](#samples)
   - [The Simple Cell-Based Control Plane](#the-simple-cell-based-control-plane)
+  - [Tenant Memory Isolation through Gateway](#tenant-memory-isolation-through-gateway)
 - [Contributing a sample](#contributing-a-sample)
 - [Further Reading](#further-reading)
 - [Costs](#costs)
@@ -28,6 +29,7 @@ described in [the Sample Standard](./docs/sample-standard.md).
 | Sample | Description |
 |---|---|
 | [The Simple Cell-Based Control Plane](./samples/control-plane/) | A minimal multi-tenant control plane for cell-based deployments — one service, one API, one DynamoDB table, one Step Functions workflow, script-driven provisioning via AWS CodeBuild. `maxTenants: 1` degenerates the model to a silo. |
+| [Tenant Memory Isolation through Gateway](./samples/tenant-memory-isolation/) | Draft solution code for shared tenant facts and separate agent sessions, using the native AgentCore Memory connector, JWT scope claims, Cedar policies, and a disposable live test environment. |
 
 ## The Simple Cell-Based Control Plane
 
@@ -47,6 +49,20 @@ operation requires a JWT from your vendor IdP, validated by a Lambda
 Authorizer.
 
 [The Simple Cell-Based Control Plane](./samples/control-plane/)
+
+## Tenant Memory Isolation through Gateway
+
+Two agents in Tenant A share selected long-term facts while Tenant B uses a
+different namespace. Issuer-controlled JWT claims scope each agent's short-term
+session. AgentCore Gateway enforces Cedar policies, and a Memory resource policy
+rejects direct data access outside that Gateway.
+
+This fork contains a draft sample with an SDK deployment and live test driver.
+Its [validation evidence](./samples/tenant-memory-isolation/VALIDATION.md) records
+observed results and remaining gaps. Full CDK and contribution gates remain
+before an upstream pull request.
+
+[Tenant Memory Isolation through Gateway](./samples/tenant-memory-isolation/)
 
 ## Contributing a sample
 
