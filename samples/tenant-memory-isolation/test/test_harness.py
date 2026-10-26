@@ -96,18 +96,10 @@ class HarnessTest(unittest.TestCase):
             create_probe_event(client, {})
         client.call.assert_not_called()
 
-    def test_positive_read_readiness_does_not_require_a_write_token(self):
-        client = Mock()
-        client.call.side_effect = [GatewayDenied("fixture"), {"event": {"eventId": "fixture"}}]
-        with patch("src.validate_live.time.sleep"), patch("builtins.print"):
-            response = call_when_ready(client, "GetEvent", {"eventId": "fixture"})
-        self.assertEqual(response["event"]["eventId"], "fixture")
-        self.assertEqual(client.call.call_count, 2)
-
     def test_excluded_operations_cannot_use_positive_readiness_retries(self):
         client = Mock()
         with self.assertRaises(ValueError):
-            call_when_ready(client, "ListActors", {})
+            call_when_ready(client, "ListEvents", {})
         client.call.assert_not_called()
 
 

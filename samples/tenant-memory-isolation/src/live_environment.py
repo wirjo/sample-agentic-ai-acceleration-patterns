@@ -38,7 +38,8 @@ def assert_token_scope(token, username, client_id):
     expected = {
         "memory_actor": actor, "memory_session": session,
         "memory_namespace": f"/tenants/{actor}/shared/",
-        "client_id": client_id, "token_use": "access",
+        "client_id": client_id,
+        "token_use": "access",  # nosec B105
     }
     try:
         _header, payload, _signature = token.split(".")
@@ -89,6 +90,26 @@ class LiveEnvironment:
         self.path.write_text(json.dumps(self.state, indent=2) + "\n")
         self.path.chmod(0o600)
 
+    def create_or_reuse_role(self, role_name, trust):
+        """Create a test role, or safely reuse the known empty retained role."""
+        try:
+            return self.iam.create_role(
+                RoleName=role_name,
+                AssumeRolePolicyDocument=json.dumps(trust))["Role"]
+        except ClientError as error:
+            if error.response["Error"]["Code"] != "EntityAlreadyExists":
+                raise
+        if (self.iam.list_role_policies(RoleName=role_name)["PolicyNames"] or
+                self.iam.list_attached_role_policies(RoleName=role_name)["AttachedPolicies"]):
+            raise RuntimeError(f"Refusing to reuse non-empty IAM role {role_name}")
+        retained_roles = set(self.state.get("retainedRoles", []))
+        retained_roles.add(role_name)
+        self.save(retainedRoles=sorted(retained_roles))
+        self.iam.update_assume_role_policy(
+            RoleName=role_name, PolicyDocument=json.dumps(trust))
+        print(f"REUSE empty retained IAM role {role_name}", flush=True)
+        return self.iam.get_role(RoleName=role_name)["Role"]
+
     @staticmethod
     def wait(fetch, expected, label, timeout=600):
         """Wait for readiness, rejecting terminal failures and timeouts."""
@@ -127,8 +148,8 @@ class LiveEnvironment:
             "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"},
             "Action": "sts:AssumeRole",
         }]}
-        identity_role = self.iam.create_role(
-            RoleName=name + "-issuer", AssumeRolePolicyDocument=json.dumps(trust))["Role"]
+        identity_role = self.create_or_reuse_role(
+            self.state.get("identityRole", name + "-issuer"), trust)
         self.save(identityRole=identity_role["RoleName"])
         function_name = name + "-issuer"
         log_group = f"/aws/lambda/{function_name}"
@@ -212,9 +233,8 @@ class LiveEnvironment:
                           "ArnLike": {"aws:SourceArn":
                               f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:*"}},
         }]}
-        role = self.iam.create_role(
-            RoleName=name + "-gateway",
-            AssumeRolePolicyDocument=json.dumps(gateway_trust))["Role"]
+        role = self.create_or_reuse_role(
+            self.state.get("gatewayRole", name + "-gateway"), gateway_trust)
         self.save(gatewayRole=role["RoleName"])
         discovery = f"https://cognito-idp.{self.region}.amazonaws.com/{pool_id}/.well-known/openid-configuration"
         config = render(self.region, self.account, "pending", memory["id"], role["Arn"],
@@ -255,7 +275,7 @@ class LiveEnvironment:
         self.wait(lambda: self.control.get_gateway_target(
             gatewayIdentifier=gateway["gatewayId"], targetId=target["targetId"]),
             "READY", "native Memory target")
-        for key in ["event-write", "event-read", "shared-recall"]:
+        for key in ["event-write", "shared-recall"]:
             policy = self.control.create_policy(**config[key + "-policy.json"])
             self.state["policies"].append(policy["policyId"])
             self.save()
@@ -358,7 +378,10 @@ class LiveEnvironment:
                 remove(key, self.iam.delete_role_policy,
                        display_label=f"{key} inline policy",
                        RoleName=self.state[key], PolicyName=policy_name)
-                remove(key, self.iam.delete_role, RoleName=self.state[key])
+                if self.state[key] in self.state.get("retainedRoles", []):
+                    print(f"RETAIN pre-existing empty role {self.state[key]}", flush=True)
+                else:
+                    remove(key, self.iam.delete_role, RoleName=self.state[key])
         remove("logGroup", self.logs.delete_log_group, logGroupName=self.state.get("logGroup"))
         for username in SCOPES:
             os.environ.pop(username.upper().replace("-", "_") + "_TOKEN", None)

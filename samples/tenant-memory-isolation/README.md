@@ -59,7 +59,7 @@ The reference architecture combines four controls:
   `ENFORCE` mode, comparing the requested memory scope with the signed claims.
 - **Memory access boundary:** The Gateway execution role has permissions for
   one Memory resource. A Memory resource policy explicitly denies data access
-  through other IAM principals.
+  unless the caller is the dedicated Gateway execution role.
 
 The execution role's trust policy limits assumption to the AgentCore service,
 the vendor's account, and the relevant Gateway and Policy engine source ARNs.
@@ -95,7 +95,6 @@ sharing boundary.
 | Policy | Scope |
 | --- | --- |
 | [Event writes](policies/event-write.cedar) | `CreateEvent` for the token's actor and session in the configured Memory resource. |
-| [Event reads and deletion](policies/event-read.cedar) | `ListEvents`, `GetEvent`, and `DeleteEvent` for the same actor and session. |
 | [Shared fact recall](policies/shared-recall.cedar) | `RetrieveMemoryRecords` and `ListMemoryRecords` for the token's full namespace path. |
 
 The supplied policies require the relevant claims and request fields.
@@ -103,11 +102,18 @@ Operations without a matching permit are denied. Event writes exclude
 caller-supplied extraction overrides, keeping the shared namespace assignment
 under the configured strategy.
 
-The execution role grants the six listed data operations on the configured
+The execution role grants the three listed data operations on the configured
 Memory ARN, plus the metadata and Policy permissions needed by the connector.
-The Memory resource policy restricts data access to that role using
-`aws:PrincipalArn`. Record-ID operations, tenant enumeration, extraction
-administration, and batch writes are outside the agent-facing policy set.
+The Memory resource policy restricts data access to the dedicated Gateway
+execution role through `aws:PrincipalArn`. Record-ID operations, tenant
+enumeration, extraction administration, and batch writes are outside the
+agent-facing policy set.
+
+Keep the context needed to continue an active conversation in the application's
+session layer. The reference solution exposes scoped event writes and shared
+fact recall. Stored event reads and deletion remain outside its agent-facing
+policy set. If your application requires stored conversation reads, introduce a
+trusted service that checks the caller's tenant and session entitlement.
 
 ## Solution components
 

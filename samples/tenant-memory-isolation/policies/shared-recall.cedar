@@ -10,8 +10,7 @@ permit (
 )
 when {
     principal.hasTag("memory_namespace") &&
-    context has input && context.input has memoryId &&
-    context.input.memoryId == "ExampleMemory-1234567890" &&
+    context has input &&
     context.input has namespacePath &&
     context.input.namespacePath == principal.getTag("memory_namespace") &&
     !(context.input has namespace)

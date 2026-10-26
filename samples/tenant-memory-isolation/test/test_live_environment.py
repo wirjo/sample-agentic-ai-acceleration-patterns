@@ -70,6 +70,25 @@ class LiveEnvironmentTest(unittest.TestCase):
         session.assert_not_called()
         self.assertIn("No AWS calls made", output.getvalue())
 
+    def test_reused_empty_role_is_recorded_for_retention(self):
+        env = object.__new__(LiveEnvironment)
+        env.state = {}
+        env.save = lambda **updates: env.state.update(updates)
+        exists = ClientError(
+            {"Error": {"Code": "EntityAlreadyExists", "Message": "fixture"}},
+            "CreateRole")
+        env.iam = SimpleNamespace(
+            create_role=Mock(side_effect=exists),
+            list_role_policies=Mock(return_value={"PolicyNames": []}),
+            list_attached_role_policies=Mock(return_value={"AttachedPolicies": []}),
+            update_assume_role_policy=Mock(),
+            get_role=Mock(return_value={"Role": {"RoleName": "fixture-role"}}),
+        )
+        role = env.create_or_reuse_role(
+            "fixture-role", {"Version": "2012-10-17", "Statement": []})
+        self.assertEqual(role["RoleName"], "fixture-role")
+        self.assertEqual(env.state["retainedRoles"], ["fixture-role"])
+
     def test_cleanup_continues_after_a_resource_wait_fails(self):
         env = object.__new__(LiveEnvironment)
         env.state = {"targetId": "fixture", "gatewayId": "fixture", "policies": []}

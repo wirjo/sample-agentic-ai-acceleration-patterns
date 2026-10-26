@@ -21,5 +21,6 @@ and negative probes never use that retry.
 
 No production security scan or service integration review has been claimed.
 The resource fence must be extended if new Memory data APIs are introduced.
-This kit permits DeleteEvent for its own session so test events can be cleaned
-up; a production read-only agent should receive a smaller action set.
+Short-term event reads and deletion are denied to agents because the native
+connector did not expose their path tenant keys to Policy during live
+validation. Deleting the dedicated test Memory removes its synthetic events.

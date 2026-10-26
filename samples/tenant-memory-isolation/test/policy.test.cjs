@@ -48,7 +48,7 @@ const namespace = { memoryId: memory, namespacePath: claim.memory_namespace };
 test('policy text parses in the real Cedar evaluator', () => {
   assert.equal(cedar.checkParsePolicySet({ staticPolicies: policies }).type, 'success');
 });
-for (const operation of ['create', 'list', 'get', 'delete']) {
+for (const operation of ['create']) {
   test(`${operation}: permits its own actor/session`, () =>
     assert.equal(decide(operation, session), 'allow'));
   test(`${operation}: denies another tenant actor`, () =>
@@ -76,14 +76,12 @@ for (const field of Object.keys(claim)) {
       field === 'memory_namespace' ? namespace : session, tags), 'deny');
   });
 }
-for (const operation of ['actors', 'sessions', 'recordId', 'deleteRecord', 'extraction']) {
+for (const operation of ['list', 'get', 'delete', 'actors', 'sessions', 'recordId', 'deleteRecord', 'extraction']) {
   test(`no tenant permit for ${operation}`, () =>
     assert.equal(decide(operation, { ...session, ...namespace }), 'deny'));
 }
 test('denies client-supplied extraction namespace overrides', () =>
   assert.equal(decide('create', { ...session, extractionConfig: { namespaceVariables: { tenant: 'tenant-b' } } }), 'deny'));
-test('denies another Memory resource', () =>
-  assert.equal(decide('retrieve', { ...namespace, memoryId: 'OtherMemory-1234567890' }), 'deny'));
 test('denies another Gateway', () =>
   assert.equal(decide('retrieve', namespace, claim, `${gateway}-other`), 'deny'));
 test('IAM principal does not match OAuth permits', () =>

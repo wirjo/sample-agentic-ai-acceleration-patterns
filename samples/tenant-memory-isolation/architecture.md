@@ -2,15 +2,12 @@
 <!-- SPDX-License-Identifier: MIT-0 -->
 # Implemented architecture
 
-**Status:** Draft solution sample; local tests pass on 2026-10-22.
-**Last cloud integration:** Attempted in `ap-southeast-2` on 2026-10-22.
-Provisioning reached READY resources and ACTIVE policies. One authorized write
-succeeded, but its subsequent read was denied; a repeat deployment still denied
-the write after bounded retries. Separate direct Memory access and execution-role
-assumption probes were denied in `us-west-2`. Shared recall and cross-tenant
-runtime rejection remain unverified. The independent teardown audit found all
-recorded service resources absent; only two permissionless IAM roles remain
-because the deployment session denies their deletion. See `VALIDATION.md`.
+**Status:** Reference solution validated locally and in `ap-southeast-2` on
+2026-10-26. Scoped writes, fresh shared tenant recall, cross-tenant denial,
+direct Memory denial, and Gateway role-assumption denial passed. The teardown
+audit found all recorded service resources absent; only two
+permissionless IAM roles remain because the deployment session denies their
+deletion. See `VALIDATION.md`.
 
 ## Purpose and identity
 
@@ -37,9 +34,11 @@ to `/tenants/{actorId}/shared/`. Retrieval uses only the exact issuer-provided
 namespacePath; descendants must have the same sharing entitlement.
 CreateEvent cannot supply extractionConfig in this kit.
 
-Event Read/Delete and Create have separate permits because their request
-schemas differ. Retrieve/List records share a namespace permit. Record-ID
-access is excluded because the ID alone does not prove namespace ownership.
+Event creation has its own permit. Short-term event reads and deletion are
+excluded because their live request context did not expose the actor and
+session path parameters needed for a safe tenant check. Retrieve/List records
+share a namespace permit. Record-ID access is excluded because the ID alone
+does not prove namespace ownership.
 Resource-based IAM denies the listed Memory data APIs outside the exact
 Gateway execution role, using `aws:PrincipalArn`. Its trust allows only the
 AgentCore service with the exact source account and Gateway/Policy engine
@@ -58,11 +57,11 @@ permissions stay pinned to the dedicated resource. Before adding a target, the
 driver replaces the wildcard with the actual Gateway ARN and narrows role trust
 to the Gateway and engine ARNs. JWT authentication and ENFORCE remain enabled
 throughout. The role separately allows `GetMemory` on the dedicated resource
-for target metadata validation; the six tenant data actions stay unchanged.
+for target metadata validation; the three tenant data actions stay unchanged.
 
 ## Validation
 
-37 policy cases run in Cedar WASM 4.14.0. Thirty-one Python tests cover
+Thirty policy cases run in Cedar WASM 4.14.0. Thirty-two Python tests cover
 SDK wire serialization, HTTP error classification, redirects, endpoint/target
 validation, generated IAM/connector configuration, live harness inputs,
 issuer-controlled scopes, idempotent readiness retries, diagnostic redaction,

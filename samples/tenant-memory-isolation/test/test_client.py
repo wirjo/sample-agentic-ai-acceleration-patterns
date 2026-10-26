@@ -54,6 +54,16 @@ class GatewayClientTest(unittest.TestCase):
         self.assertNotIn(token, json.dumps(denied.exception.diagnostic))
         self.assertEqual(denied.exception.diagnostic["requestId"], "fixture")
 
+    def test_backend_error_diagnostics_never_include_the_bearer_token(self):
+        token = "synthetic-local-token"
+        client = self.make_client(lambda request: httpx.Response(
+            400, headers={"x-amzn-requestid": "fixture"},
+            json={"message": f"Bad request containing {token}"}))
+        with self.assertRaises(httpx.HTTPStatusError) as failed:
+            client.call("ListActors", {"memoryId": "ExampleMemory-1234567890"})
+        self.assertNotIn(token, json.dumps(failed.exception.diagnostic))
+        self.assertEqual(failed.exception.diagnostic["statusCode"], 400)
+
     def test_token_never_crosses_redirect(self):
         client = self.make_client(lambda request: httpx.Response(307, headers={"Location": "https://other.example.com/"}))
         with self.assertRaises(httpx.HTTPStatusError):
@@ -87,8 +97,7 @@ class GatewayClientTest(unittest.TestCase):
                       "arn:aws:iam::000000000000:role/ExampleGatewayRole",
                       "https://issuer.example.com/.well-known/openid-configuration", "example-client",
                       "arn:aws:bedrock-agentcore:us-west-2:000000000000:policy-engine/example123456")
-        for filename in ["event-read-policy.json", "event-write-policy.json",
-                         "shared-recall-policy.json"]:
+        for filename in ["event-write-policy.json", "shared-recall-policy.json"]:
             self.assertRegex(plan[filename]["name"], r"^[A-Za-z][A-Za-z0-9_]*$")
 
     def test_gateway_role_can_evaluate_only_its_policy_engine_and_gateway(self):

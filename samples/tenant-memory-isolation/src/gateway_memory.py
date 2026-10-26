@@ -67,7 +67,18 @@ class GatewayMemory:
                 "body": body[:4000],
             }
             raise denial
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            body = response.text.replace(self.token, "[REDACTED]")
+            body = re.sub(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",
+                          "[REDACTED]", body)
+            error.diagnostic = {
+                "operation": operation, "statusCode": response.status_code,
+                "requestId": response.headers.get("x-amzn-requestid"),
+                "body": body[:4000],
+            }
+            raise
         return response.json() if response.content else {}
 
     def close(self):

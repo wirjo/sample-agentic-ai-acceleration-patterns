@@ -57,11 +57,12 @@ def validate_config(config):
 
 
 def assert_fence(policy, config):
-    """Confirm an explicit deny outside the exact Gateway execution role."""
+    """Confirm an explicit deny outside the dedicated Gateway execution role."""
     for statement in policy.get("Statement", []):
         if (statement.get("Effect") == "Deny" and statement.get("Principal") == "*" and
                 statement.get("Resource") == config["memoryArn"] and
-                statement.get("Condition") == {"ArnNotEquals": {"aws:PrincipalArn": config["gatewayRoleArn"]}} and
+                statement.get("Condition") == {
+                    "ArnNotEquals": {"aws:PrincipalArn": config["gatewayRoleArn"]}} and
                 set(statement.get("Action", [])) >= {f"bedrock-agentcore:{name}" for name in DATA_ACTIONS}):
             return
     raise AssertionError("Memory resource policy lacks the complete expected execution-role fence")
@@ -137,7 +138,6 @@ def run(config, extraction_timeout, report):
     """Run a real test; only observed authorization denials pass negative cases."""
     validate_config(config)
     clients = {}
-    created = []
     results = []
     complete = False
     control = boto3.client("bedrock-agentcore-control", region_name=config["region"])
@@ -214,11 +214,7 @@ def run(config, extraction_timeout, report):
                     "text": f"Our organisation's warehouse codename is {marker}. Remember this shared operational fact.",
                 }}}],
             })
-            created.append((key, event["event"]["eventId"]))
             passed(f"{key}: writes its own scoped event")
-            call_when_ready(clients[key], "GetEvent",
-                            {**session_params(key), "eventId": event["event"]["eventId"]})
-            passed(f"{key}: reads its own scoped event")
         support_event = create_probe_event(clients["a-support"], {
             **session_params("a-support"), "eventTimestamp": datetime.now(timezone.utc),
             "clientToken": str(uuid.uuid4()),
@@ -226,10 +222,9 @@ def run(config, extraction_timeout, report):
                 "text": "Synthetic support conversation setup.",
             }}}],
         })
-        created.append(("a-support", support_event["event"]["eventId"]))
         passed("a-support: writes its own scoped event")
-        call_when_ready(clients["a-support"], "ListEvents", session_params("a-support"))
-        passed("a-support: can list its own session")
+        deny("Short-term event reads are not exposed to agents", clients["a-support"],
+             "ListEvents", session_params("a-support"))
         deny("A cannot read B's short-term session", clients["a-shopping"], "ListEvents",
              session_params("b-shopping"))
         deny("A shopping cannot read A support session", clients["a-shopping"], "ListEvents",
@@ -325,11 +320,6 @@ def run(config, extraction_timeout, report):
         results.append({"case": "Live matrix", "result": "FAILED", "errorType": type(error).__name__})
         raise
     finally:
-        for key, event_id in created:
-            try:
-                clients[key].call("DeleteEvent", {**session_params(key), "eventId": event_id})
-            except Exception:
-                results.append({"case": f"{key}: event cleanup", "result": "FAILED"})
         for client in clients.values():
             client.close()
         report.write_text(json.dumps({"status": "PASSED" if complete and

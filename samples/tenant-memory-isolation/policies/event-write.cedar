@@ -7,8 +7,7 @@ permit (
 )
 when {
     principal.hasTag("memory_actor") && principal.hasTag("memory_session") &&
-    context has input && context.input has memoryId &&
-    context.input.memoryId == "ExampleMemory-1234567890" &&
+    context has input &&
     context.input has actorId && context.input has sessionId &&
     context.input.actorId == principal.getTag("memory_actor") &&
     context.input.sessionId == principal.getTag("memory_session") &&

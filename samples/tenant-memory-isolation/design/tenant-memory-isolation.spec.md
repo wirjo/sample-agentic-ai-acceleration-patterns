@@ -18,7 +18,8 @@ CDK contribution gates remain outside this iteration.
 2. **P-2: Share only the facts the tenant has agreed to share.** Tenant-wide
    memory contains synthetic organisational facts, not private user preferences.
 3. **P-3: A missing claim or an unlisted operation denies access.** Each Cedar
-   permit names its operations, Gateway, and Memory resource.
+   permit names its operations and Gateway. The connector fixes the Memory ID,
+   and IAM permissions pin the Memory resource ARN.
 4. **P-4: Evidence must distinguish policy evaluation from deployed enforcement.**
    Local Cedar tests are real language evaluation, but do not prove JWT
    validation, Gateway context mapping, extraction, or resource-policy enforcement.
@@ -43,10 +44,13 @@ must use a distinct actor/path and issue separate scoped tokens.
 ## API surface
 
 Native Memory HTTP operations are routed through `/{targetName}/{Memory path}`.
-The SDK model supplies the Memory method, path, and wire serialization. Events
-support Create, List, Get, and Delete. Long-term records support Retrieve and
-List with `namespacePath`. Actor/session enumeration, record-ID access, batch
-writes, and extraction administration receive no tenant permits.
+The SDK model supplies the Memory method, path, and wire serialization. The
+agent-facing API permits `CreateEvent` only for the signed actor/session pair,
+and `RetrieveMemoryRecords` and `ListMemoryRecords` only for the signed
+`namespacePath`. Stored event reads and deletion, actor/session enumeration,
+record-ID access, batch writes, and extraction administration receive no tenant
+permits. Applications retain the context needed to continue active conversations
+in their own session layer.
 
 ## Contracts
 

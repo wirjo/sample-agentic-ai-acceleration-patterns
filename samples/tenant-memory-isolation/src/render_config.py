@@ -9,11 +9,11 @@ from pathlib import Path
 from botocore.session import Session
 from botocore.validate import validate_parameters
 
-ALLOWED = ["CreateEvent", "ListEvents", "GetEvent", "DeleteEvent",
-           "RetrieveMemoryRecords", "ListMemoryRecords"]
+ALLOWED = ["CreateEvent", "RetrieveMemoryRecords", "ListMemoryRecords"]
 BATCH = ["BatchCreateMemoryRecords", "BatchUpdateMemoryRecords", "BatchDeleteMemoryRecords"]
 DATA_ACTIONS = ALLOWED + [
-    "ListActors", "ListSessions", "GetMemoryRecord", "DeleteMemoryRecord",
+    "ListEvents", "GetEvent", "DeleteEvent", "ListActors", "ListSessions",
+    "GetMemoryRecord", "DeleteMemoryRecord",
     "ListMemoryExtractionJobs", "StartMemoryExtractionJob",
 ] + BATCH
 FIXTURE_GATEWAY = "arn:aws:bedrock-agentcore:us-west-2:000000000000:gateway/example"
@@ -81,13 +81,14 @@ def render(region, account, gateway_id, memory_id, role_arn, discovery_url,
         },
         "memory-resource-policy.json": {
             "Version": "2012-10-17", "Statement": [
-                {"Sid": "DenyDataAccessOutsideGatewayRole", "Effect": "Deny", "Principal": "*",
+                {"Sid": "DenyDataAccessOutsideGateway", "Effect": "Deny", "Principal": "*",
                  "Action": [f"bedrock-agentcore:{name}" for name in DATA_ACTIONS],
                  "Resource": memory_arn,
                  "Condition": {"ArnNotEquals": {"aws:PrincipalArn": role_arn}}},
                 {"Sid": "AllowGatewayRole", "Effect": "Allow", "Principal": {"AWS": role_arn},
                  "Action": [f"bedrock-agentcore:{name}" for name in ALLOWED],
-                 "Resource": memory_arn},
+                 "Resource": memory_arn,
+                 "Condition": {"ArnEquals": {"aws:PrincipalArn": role_arn}}},
                 {"Sid": "DenyBatchOperationsInValidationMemory", "Effect": "Deny", "Principal": "*",
                  "Action": [f"bedrock-agentcore:{name}" for name in BATCH], "Resource": memory_arn},
             ],
