@@ -14,7 +14,15 @@ deletion. See `VALIDATION.md`.
 The vendor pools one Memory resource for synthetic tenant organisations.
 The issuer supplies full memory scopes; Gateway validates signed JWTs and
 enforces Cedar. Both A agents have the same actor/shared path and distinct
-session claims (ADR-0001). Clients cannot construct a broader permit.
+session claims ([ADR-0001](adr/0001-use-issuer-scoped-claims.md)). Clients cannot
+construct a broader permit.
+
+Inbound `CUSTOM_JWT` and outbound `GATEWAY_IAM_ROLE` make the dedicated Gateway
+role the identity that reaches Memory. Cedar evaluates claims on the typed
+`AgentCore::OAuthUser` principal; those claims do not become IAM session tags
+on the execution role. No Gateway interceptor or STS vending service is
+configured. ADR-0001 documents upstream caller IAM credentials, custom-target
+vending, and an optional hybrid as alternative designs.
 
 ## Components
 
@@ -25,7 +33,8 @@ into real calls and reports observed status. `src/live_environment.py` creates
 the dedicated environment and tears it down in a `finally` block.
 `src/test_identity.py` supplies Cognito access-token scopes for three fixed
 synthetic identities (ADR-0003); production tenant membership is an external
-responsibility.
+responsibility. This Lambda produces issuer claims; it does not vend downstream
+credentials.
 
 ## Data model and workflows
 
@@ -76,5 +85,5 @@ request outside Gateway and an attempted direct role assumption. Failed
 extraction is a failed/incomplete test, not a
 successful isolation outcome.
 
-This draft intentionally stops short of the full deployable sample standard
-(ADR-0002); the README lists remaining merge gates.
+The repository contribution requirements remain documented in
+[ADR-0002](adr/0002-deliver-draft-validation-kit.md).

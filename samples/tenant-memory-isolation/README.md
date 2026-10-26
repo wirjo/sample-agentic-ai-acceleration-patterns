@@ -65,6 +65,34 @@ The execution role's trust policy limits assumption to the AgentCore service,
 the vendor's account, and the relevant Gateway and Policy engine source ARNs.
 Tenant scope comes from the signed JWT claims evaluated by Cedar.
 
+## Choose where to enforce tenant access
+
+The reference solution uses JWT authentication and Cedar with the native Memory
+connector. Token vending offers another identity path: a trusted service
+exchanges verified application identity for scoped temporary credentials.
+Cedar authorizes requests; it does not issue credentials.
+
+| Path | Best fit | Identity that reaches Memory |
+| --- | --- | --- |
+| **JWT and Cedar, implemented here** | OAuth applications using the native Memory connector. | The dedicated Gateway execution role; Cedar checks tenant, session, and namespace claims first. |
+| **Upstream token vending and caller IAM credentials** | IAM-federated workloads or downstream IAM attribution. | The caller's scoped IAM identity, obtained before signing an `AWS_IAM` Gateway request with SigV4 and forwarded through `CALLER_IAM_CREDENTIALS`. |
+| **Interceptor vending and a custom target** | Custom tools needing credential exchange or current entitlement lookups. | The vended IAM identity, explicitly consumed by a custom Memory SDK client. |
+
+For native Memory, `CUSTOM_JWT` requires `GATEWAY_IAM_ROLE`. Credentials
+issued by an interceptor do not automatically become the connector's signing
+credentials. OAuth principal tags in Cedar also do not become IAM session tags
+on that role.
+
+Each path needs the same deliberate sharing model: a common recall entitlement
+and separate write-session entitlements. The IAM and custom-target paths are
+design alternatives to the implemented solution.
+
+[ADR-0001](adr/0001-use-issuer-scoped-claims.md) explains the choices, an optional
+interceptor-and-Cedar hybrid, and credential lifecycle responsibilities. See
+the [connector compatibility matrix](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory-gateway-connector.html)
+and the [AWS Policy and interceptor comparison](https://aws.amazon.com/blogs/machine-learning/secure-ai-agents-with-policy-and-lambda-interceptors-in-amazon-bedrock-agentcore-gateway/)
+for service details.
+
 ## Tenant and agent memory model
 
 The example uses two agents in Tenant A and one agent in Tenant B:
